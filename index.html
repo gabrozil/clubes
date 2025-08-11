@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organizador de Clubes PRO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-light: #f3f4f6; --text-light: #1f2937; --text-title-light: #111827; --card-light: #ffffff; --input-light: #f9fafb;
+            --bg-dark: #111827; --text-dark: #f9fafb; --text-title-dark: #ffffff; --card-dark: #1f2937; --input-dark: #374151;
+        }
+        html.dark { 
+            --bg-light: var(--bg-dark); 
+            --text-light: var(--text-dark); 
+            --text-title-light: var(--text-title-dark);
+            --card-light: var(--card-dark);
+            --input-light: var(--input-dark);
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-light);
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .title-color { color: var(--text-title-light); }
+        .card { background-color: var(--card-light); }
+        .input-bg { background-color: var(--input-light); }
+        .modal-card { background-color: var(--bg-light); }
+        .star { cursor: pointer; transition: color 0.2s, transform 0.2s, opacity 0.2s; }
+        .star-rating .star:hover { transform: scale(1.15); }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); animation: fadeIn 0.3s; }
+        .modal-content { animation: slideIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideIn { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .prose ul { list-style-type: '✓ '; padding-left: 20px; }
+        .prose li { margin-bottom: 8px; padding-left: 8px;}
+        .prose h3 { margin-bottom: 12px; }
+        .main-toast {
+            position: fixed;
+            bottom: 1.5rem;
+            left: 1.5rem;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            color: white;
+            font-weight: 600;
+            z-index: 2000;
+            animation: main-toast-in-out 4s ease-in-out forwards;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        @keyframes main-toast-in-out {
+            0% { transform: translateX(-120%); opacity: 0; }
+            15% { transform: translateX(0); opacity: 1; }
+            85% { transform: translateX(0); opacity: 1; }
+            100% { transform: translateX(-120%); opacity: 0; }
+        }
+        .dropdown { position: relative; display: inline-block; }
+        .dropdown-content { display: none; position: absolute; background-color: var(--card-light); min-width: 160px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1; border-radius: 8px; right: 0; }
+        .dropdown-content a { color: var(--text-light); padding: 12px 16px; text-decoration: none; display: block; }
+        .dropdown-content a:hover { background-color: var(--input-light); }
+        .show { display: block; }
+    </style>
+</head>
+<body class="p-4 sm:p-6 md:p-8">
+    <div class="max-w-screen-2xl mx-auto">
+        <!-- Cabeçalho -->
+        <header class="mb-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="text-left">
+                <h1 class="text-4xl font-bold title-color">Painel de Clubes</h1>
+            </div>
+            <div class="flex items-center gap-4">
+                 <div class="bg-gray-200 dark:bg-gray-700 p-2 rounded-lg flex items-center gap-2">
+                     <button id="prev-week-btn" class="p-1 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-lg font-bold">&larr;</button>
+                     <select id="global-week-selector" class="text-sm p-1 border border-gray-300 dark:border-gray-600 input-bg rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></select>
+                     <button id="next-week-btn" class="p-1 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-lg font-bold">&rarr;</button>
+                 </div>
+                 <div class="bg-gray-200 dark:bg-gray-700 p-2 rounded-lg flex items-center gap-3">
+                     <span class="font-medium text-gray-800 dark:text-gray-200 text-sm">Perfil:</span>
+                     <span id="current-profile-display" class="font-bold text-indigo-600 dark:text-indigo-400 text-sm"></span>
+                     <button onclick="changeProfile()" class="ml-auto bg-white dark:bg-gray-800 text-xs font-semibold py-1 px-3 rounded-md shadow-sm hover:bg-gray-100 dark:hover:bg-gray-900">Trocar</button>
+                 </div>
+                <button id="theme-toggle" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                    <svg id="theme-icon-light" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    <svg id="theme-icon-dark" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Seção Principal -->
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-8">
+                <section class="card p-6 rounded-xl shadow-md">
+                    <h2 class="text-2xl font-semibold title-color mb-4">Adicionar Novo Clube</h2>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <input type="text" id="new-club-name" placeholder="Nome do Clube" class="flex-grow p-3 border border-gray-300 dark:border-gray-600 input-bg rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <button onclick="addClub()" class="bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-indigo-700 transition duration-300 shadow-sm">Adicionar</button>
+                    </div>
+                </section>
+                <section>
+                    <h2 class="text-2xl font-semibold title-color mb-4">Clubes</h2>
+                    <div id="clubs-list" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+                </section>
+            </div>
+            <aside class="space-y-8">
+                <section class="card p-6 rounded-xl shadow-md">
+                    <h3 class="text-2xl font-semibold title-color mb-4">Destaques Gerais</h3>
+                    <div id="highlights-list" class="space-y-3"></div>
+                </section>
+                <section class="card p-6 rounded-xl shadow-md">
+                    <h3 class="text-2xl font-semibold title-color mb-4">Ranking Geral</h3>
+                    <div id="ranking-list" class="space-y-3"></div>
+                </section>
+                <section class="card p-6 rounded-xl shadow-md">
+                    <h3 class="text-2xl font-semibold title-color mb-4">Destaques da Semana</h3>
+                    <div id="weekly-highlights-list" class="space-y-3"></div>
+                </section>
+                <section class="card p-6 rounded-xl shadow-md">
+                    <h3 class="text-2xl font-semibold title-color mb-4">Ranking Semanal</h3>
+                    <div id="weekly-ranking-list" class="space-y-3"></div>
+                </section>
+                <section class="card p-6 rounded-xl shadow-md">
+                     <h3 class="text-2xl font-semibold title-color mb-4">Relatórios</h3>
+                     <div class="flex flex-col gap-3">
+                         <button onclick="openReportModal()" class="w-full bg-sky-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-sky-700 transition duration-300">Visualizar Relatório</button>
+                         <button onclick="exportReport()" class="w-full bg-green-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-green-700 transition duration-300">Exportar (PDF)</button>
+                    </div>
+                </section>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Modal de Seleção de Perfil -->
+    <div id="profile-modal" class="modal items-center justify-center">
+        <div class="modal-content modal-card rounded-xl shadow-2xl w-11/12 sm:w-auto p-8 text-center">
+            <h2 class="text-3xl font-bold title-color mb-2">Quem está a avaliar?</h2>
+            <div class="mb-6">
+                <label for="profile-week-selector" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Semana da Avaliação:</label>
+                <div class="flex items-center gap-2">
+                    <button id="modal-prev-week-btn" class="p-1 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-lg font-bold">&larr;</button>
+                    <select id="profile-week-selector" class="flex-grow mt-1 block w-full p-2 border border-gray-300 dark:border-gray-600 input-bg rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></select>
+                    <button id="modal-next-week-btn" class="p-1 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-lg font-bold">&rarr;</button>
+                </div>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <button onclick="selectProfile('professor')" class="bg-blue-600 text-white font-semibold py-3 px-8 rounded-lg hover:bg-blue-700 transition">Professor</button>
+                <button onclick="selectProfile('diretor')" class="bg-purple-600 text-white font-semibold py-3 px-8 rounded-lg hover:bg-purple-700 transition">Diretor</button>
+                <button onclick="selectProfile('viceDiretor')" class="bg-teal-600 text-white font-semibold py-3 px-8 rounded-lg hover:bg-teal-700 transition">Vice-Diretor</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Avaliação -->
+    <div id="club-modal" class="modal items-start sm:items-center justify-center pt-10">
+        <div class="modal-content modal-card rounded-xl shadow-2xl w-11/12 md:w-3/4 lg:w-2/3 p-6 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-start mb-4">
+                <h2 id="modal-club-name" class="text-2xl font-bold title-color pr-4"></h2>
+                <button onclick="closeModal('club-modal')" class="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium py-1 px-3 rounded-lg text-sm flex items-center gap-2 transition-colors flex-shrink-0">&times; <span class="hidden sm:inline">Fechar</span></button>
+            </div>
+            
+            <div id="modal-criteria-table" class="space-y-2"></div>
+            
+            <div class="mt-4">
+                 <div id="evaluation-feedback" class="text-center font-semibold text-red-800 dark:text-red-300 bg-red-200 dark:bg-red-500/30 p-3 rounded-lg mb-4 text-base opacity-0 transition-opacity duration-300 h-auto"></div>
+                 <button onclick="submitEvaluation()" class="w-full bg-indigo-600 text-white font-semibold py-2.5 rounded-lg hover:bg-indigo-700 transition">Enviar Avaliação</button>
+            </div>
+            
+            <div class="pt-4 mt-4 border-t border-gray-200 dark:border-gray-600">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="card p-2 rounded-lg shadow-sm">
+                         <h4 class="text-sm font-semibold mb-1 text-center">Gerenciar Critérios</h4>
+                         <div class="flex gap-2">
+                            <input type="text" id="new-criterion-name" placeholder="Novo critério global" class="flex-grow p-2 text-sm border border-gray-300 dark:border-gray-600 input-bg rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <button id="add-criterion-btn" class="bg-blue-500 text-white font-semibold py-2 px-3 text-sm rounded-lg hover:bg-blue-600 transition">Add</button>
+                         </div>
+                    </div>
+                    <div class="card p-2 rounded-lg shadow-sm">
+                        <h4 class="text-sm font-semibold mb-1 text-center">Análise com IA</h4>
+                        <button id="generate-feedback-btn" onclick="generateFeedback()" class="w-full bg-purple-600 text-white font-semibold py-2 px-3 text-sm rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-2">
+                            ✨ Gerar Dicas
+                        </button>
+                    </div>
+                </div>
+                <div id="ai-feedback-container" class="mt-3 text-gray-600 dark:text-gray-300 prose max-w-none text-sm"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Relatório -->
+    <div id="report-modal" class="modal items-center justify-center">
+        <div class="modal-content modal-card rounded-xl shadow-2xl w-11/12 md:w-3/4 lg:w-2/3 my-10 p-6 md:p-8 overflow-y-auto max-h-[90vh]">
+             <div class="flex justify-between items-center mb-6">
+                <h2 class="text-3xl font-bold title-color">Visualização do Relatório</h2>
+                <button onclick="closeModal('report-modal')" class="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium py-1 px-3 rounded-lg text-sm flex items-center gap-2 transition-colors">&times; <span class="hidden sm:inline">Fechar</span></button>
+            </div>
+            <div id="report-preview-content"></div>
+        </div>
+    </div>
+    
+    <!-- Modal de Gráfico -->
+    <div id="chart-modal" class="modal items-center justify-center">
+        <div class="modal-content modal-card rounded-xl shadow-2xl w-11/12 md:w-3/4 lg:w-2/3 my-10 p-6 md:p-8 overflow-y-auto max-h-[90vh]">
+             <div class="flex justify-between items-center mb-6">
+                <h2 id="chart-modal-title" class="text-3xl font-bold title-color">Desempenho Semanal</h2>
+                <button onclick="closeModal('chart-modal')" class="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium py-1 px-3 rounded-lg text-sm flex items-center gap-2 transition-colors">&times; <span class="hidden sm:inline">Fechar</span></button>
+            </div>
+            <div class="w-full h-96">
+                <canvas id="club-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+        let appData = { clubs: [], currentProfile: null };
+        let currentClubId = null;
+        let feedbackTimeout;
+        let selectedWeekKey = null;
+        let clubChart = null; // Variável para a instância do gráfico
+
+        const initialCriteria = [
+            { name: 'Organização da sala', evaluations: {} }, 
+            { name: 'Clima de colaboração', evaluations: {} },
+            { name: 'Engajamento', evaluations: {} }, 
+            { name: 'Liderança', evaluations: {} }
+        ];
+
+        // --- Funções de UI e Tema ---
+        function applyTheme(theme) {
+            const lightIcon = document.getElementById('theme-icon-light');
+            const darkIcon = document.getElementById('theme-icon-dark');
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+                lightIcon.classList.add('hidden');
+                darkIcon.classList.remove('hidden');
+            } else {
+                document.documentElement.classList.remove('dark');
+                lightIcon.classList.remove('hidden');
+                darkIcon.classList.add('hidden');
+            }
+        }
+        
+        // --- Funções de Avaliação e Cor ---
+        function getRatingInfo(average, isEvaluated) {
+            if (!isEvaluated) return { color: 'text-gray-400 dark:text-gray-500', starColor: 'text-gray-400 dark:text-gray-500', bg: 'bg-gray-100 dark:bg-gray-800', border: 'border-gray-300 dark:border-gray-600', text: 'Não avaliado', colorName: 'gray' };
+            if (average <= 2) return { color: 'text-red-600 dark:text-red-400', starColor: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/50', border: 'border-red-500', text: 'Precisa de Atenção', colorName: 'red' };
+            if (average <= 3.5) return { color: 'text-orange-600 dark:text-orange-400', starColor: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/50', border: 'border-orange-500', text: 'Bom', colorName: 'orange' };
+            return { color: 'text-green-600 dark:text-green-400', starColor: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/50', border: 'border-green-500', text: 'Excelente', colorName: 'green' };
+        }
+        function getStarText(score) {
+            return ['Não avaliado', 'Muito abaixo', 'Abaixo do esperado', 'Bom', 'Muito bom', 'Excelente'][score] || 'Não avaliado';
+        }
+        function getStarColor(score) {
+            if (score <= 2) return 'text-red-500';
+            if (score === 3) return 'text-orange-500';
+            if (score >= 4) return 'text-green-500';
+            return 'text-gray-300 dark:text-gray-600';
+        }
+
+        // --- Funções de Data e Semana ---
+        function getMondayOf(date) {
+            const d = new Date(date);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            d.setDate(diff);
+            d.setHours(0, 0, 0, 0);
+            return d;
+        }
+
+        function getMondaysUntilEndOfYear() {
+            const mondays = [];
+            const today = new Date();
+            const year = today.getFullYear();
+            let monday = getMondayOf(new Date(year, 0, 1)); 
+
+            while (monday.getFullYear() <= year) {
+                mondays.push(monday.toISOString().split('T')[0]);
+                monday.setDate(monday.getDate() + 7);
+            }
+            return mondays;
+        }
+
+        function getInitialWeek() {
+            const today = new Date();
+            if (today.getDay() === 0) {
+                today.setDate(today.getDate() + 1);
+            }
+            return getMondayOf(today).toISOString().split('T')[0];
+        }
+
+        // --- Funções de Dados (localStorage) ---
+        function saveData() { localStorage.setItem('clubsAppData', JSON.stringify(appData)); }
+        function loadData() {
+            const data = localStorage.getItem('clubsAppData');
+            if (data) {
+                appData = JSON.parse(data);
+            }
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            applyTheme(savedTheme);
+
+            initializeWeekSelection();
+            
+            if (!appData.currentProfile) {
+                openModal('profile-modal');
+            } else {
+                updateProfileDisplay();
+                renderAll();
+            }
+        }
+        
+        async function getEmojiForClub(clubName) {
+            const prompt = `Forneça um único emoji que melhor represente um clube com o nome: "${clubName}". Responda apenas com o emoji, sem texto adicional.`;
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+
+            try {
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error('API request failed');
+                const result = await response.json();
+                const emoji = result.candidates?.[0]?.content.parts[0].text.trim();
+                if (emoji && emoji.length <= 4) return emoji;
+            } catch (error) {
+                console.error("Erro ao buscar emoji da IA:", error);
+            }
+            return '🚀'; // Fallback
+        }
+
+        // --- Funções de Cálculo ---
+        function calculateAverage(club) {
+            let totalCriterionAverages = 0;
+            let ratedCriteriaCount = 0;
+            let isAnyScoreGiven = false;
+
+            club.criteria.forEach(criterion => {
+                const allScores = Object.values(criterion.evaluations).flatMap(week => Object.values(week));
+                const validScores = allScores.filter(score => score > 0);
+                
+                if (validScores.length > 0) {
+                    isAnyScoreGiven = true;
+                    const criterionAverage = validScores.reduce((sum, score) => sum + score, 0) / validScores.length;
+                    totalCriterionAverages += criterionAverage;
+                    ratedCriteriaCount++;
+                }
+            });
+
+            if (ratedCriteriaCount === 0) {
+                return { average: 0, isEvaluated: false };
+            }
+
+            const finalAverage = totalCriterionAverages / ratedCriteriaCount;
+            return { average: finalAverage, isEvaluated: isAnyScoreGiven };
+        }
+
+        function calculateProfileAverage(club, profile) {
+            let totalScore = 0;
+            let ratedCount = 0;
+            club.criteria.forEach(criterion => {
+                Object.values(criterion.evaluations).forEach(weekScores => {
+                    const score = weekScores[profile];
+                    if (score > 0) {
+                        totalScore += score;
+                        ratedCount++;
+                    }
+                });
+            });
+            if (ratedCount === 0) return { average: 0, isEvaluated: false };
+            return { average: totalScore / ratedCount, isEvaluated: true };
+        }
+
+        function calculateWeeklyAverage(club, weekKey) {
+            let totalCriterionAverages = 0;
+            let ratedCriteriaCount = 0;
+            let isAnyScoreGiven = false;
+
+            club.criteria.forEach(criterion => {
+                const weekEvaluation = criterion.evaluations[weekKey];
+                if (weekEvaluation) {
+                    const profileScores = Object.values(weekEvaluation).filter(score => score > 0);
+                    if (profileScores.length > 0) {
+                        isAnyScoreGiven = true;
+                        const criterionAverage = profileScores.reduce((sum, score) => sum + score, 0) / profileScores.length;
+                        totalCriterionAverages += criterionAverage;
+                        ratedCriteriaCount++;
+                    }
+                }
+            });
+
+            if (ratedCriteriaCount === 0) return { average: 0, isEvaluated: false };
+            return { average: totalCriterionAverages / ratedCriteriaCount, isEvaluated: isAnyScoreGiven };
+        }
+
+        function hasProfileEvaluatedForWeek(club, profile, weekKey) {
+            if (!profile || !club.criteria || club.criteria.length === 0) return false;
+            return club.criteria.every(criterion => criterion.evaluations[weekKey]?.[profile] > 0);
+        }
+
+        // --- Funções de Renderização ---
+        function renderAll() {
+            renderClubsList();
+            renderRanking();
+            renderHighlights();
+            renderWeeklyRanking();
+            renderWeeklyHighlights();
+        }
+
+        function renderClubsList() {
+            const list = document.getElementById('clubs-list');
+            list.innerHTML = '';
+            if (appData.clubs.length === 0) {
+                list.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Nenhum clube adicionado ainda.</p>';
+                return;
+            }
+            appData.clubs.forEach(club => {
+                const { average, isEvaluated } = calculateAverage(club);
+                const rating = getRatingInfo(average, isEvaluated);
+                
+                const profileHasRatedThisWeek = hasProfileEvaluatedForWeek(club, appData.currentProfile, selectedWeekKey);
+                const btnText = profileHasRatedThisWeek ? 'Avaliar Novamente' : 'Avaliar Semana';
+                const btnClass = profileHasRatedThisWeek ? 'bg-green-600 hover:bg-green-700' : 'bg-indigo-600 hover:bg-indigo-700';
+
+                let profileScoresHTML = '<div class="mt-2 text-xs flex flex-wrap gap-x-4 gap-y-1">';
+                const profiles = { professor: 'Professor', diretor: 'Diretor', viceDiretor: 'Vice-Diretor' };
+                let hasProfileScores = false;
+
+                for (const profile in profiles) {
+                    const profileAvg = calculateProfileAverage(club, profile);
+                    if (profileAvg.isEvaluated) {
+                        hasProfileScores = true;
+                        profileScoresHTML += `<span class="text-gray-500 dark:text-gray-400">${profiles[profile]}: <strong class="font-bold text-gray-700 dark:text-gray-200">${profileAvg.average.toFixed(2)}</strong></span>`;
+                    }
+                }
+                profileScoresHTML += '</div>';
+                if (!hasProfileScores) {
+                    profileScoresHTML = '<div class="mt-2 text-xs text-gray-400 italic">Nenhuma avaliação ainda.</div>';
+                }
+
+                const clubElement = document.createElement('div');
+                clubElement.className = `card p-4 rounded-lg shadow-sm flex flex-col justify-between border-l-4 ${rating.border}`;
+                clubElement.id = `club-${club.id}`;
+                
+                clubElement.innerHTML = `
+                    <div class="w-full" ondblclick="startEditClub('${club.id}')">
+                        <h3 class="text-xl font-semibold flex items-center gap-3 title-color cursor-pointer">
+                            <span>${club.emoji || '...'}</span> <span>${club.name}</span>
+                            ${isEvaluated ? '<span class="text-green-500 text-xs" title="Avaliado">✓</span>' : ''}
+                        </h3>
+                        <p class="text-sm ${rating.color}">Média Geral: ${average.toFixed(2)} (${rating.text})</p>
+                        ${profileScoresHTML}
+                    </div>
+                    <div class="w-full mt-4">
+                        <button onclick="openModal('club-modal', '${club.id}')" class="w-full text-white font-medium py-2 px-4 rounded-lg transition duration-300 text-sm ${btnClass}">${btnText}</button>
+                    </div>
+                `;
+                list.appendChild(clubElement);
+            });
+        }
+
+        function renderRanking() {
+            const list = document.getElementById('ranking-list');
+            list.innerHTML = '';
+            const sortedClubs = [...appData.clubs]
+                .map(c => ({...c, calc: calculateAverage(c)}))
+                .filter(c => c.calc.isEvaluated)
+                .sort((a, b) => b.calc.average - a.calc.average);
+
+            if (sortedClubs.length === 0) {
+                list.innerHTML = '<p class="text-gray-500 dark:text-gray-400">O ranking aparecerá aqui.</p>';
+                return;
+            }
+            sortedClubs.forEach(club => {
+                const rating = getRatingInfo(club.calc.average, true);
+                list.innerHTML += `
+                    <div class="flex justify-between items-center p-2 input-bg rounded-md">
+                        <span class="font-medium text-sm">${club.emoji} ${club.name}</span>
+                        <span class="font-bold text-sm ${rating.color}">${club.calc.average.toFixed(2)}</span>
+                    </div>`;
+            });
+        }
+
+        function renderHighlights() {
+            const list = document.getElementById('highlights-list');
+            list.innerHTML = '';
+            const highlighted = [...appData.clubs]
+                .map(c => ({ ...c, calc: calculateAverage(c) }))
+                .filter(c => c.calc.average > 3.5)
+                .sort((a, b) => b.calc.average - a.calc.average).slice(0, 3);
+
+            if (highlighted.length === 0) {
+                list.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Clubes com média alta aparecerão aqui.</p>';
+                return;
+            }
+            highlighted.forEach(club => {
+                const rating = getRatingInfo(club.calc.average, true);
+                list.innerHTML += `
+                    <div class="flex items-center justify-between p-2 ${rating.bg} rounded-md">
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-3">🏆</span>
+                            <div>
+                                <p class="font-semibold text-green-800 dark:text-green-200">${club.name}</p>
+                                <p class="text-sm text-green-600 dark:text-green-400">Média: ${club.calc.average.toFixed(2)}</p>
+                            </div>
+                        </div>
+                        <div class="dropdown">
+                            <button onclick="toggleDropdown('dropdown-${club.id}')" class="p-2 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" /></svg>
+                            </button>
+                            <div id="dropdown-${club.id}" class="dropdown-content">
+                                <a href="#" onclick="event.preventDefault(); openChartModal('${club.id}')">Mostrar gráfico semanal</a>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        function renderWeeklyRanking() {
+            const list = document.getElementById('weekly-ranking-list');
+            list.innerHTML = '';
+            const sortedClubs = [...appData.clubs]
+                .map(c => ({...c, calc: calculateWeeklyAverage(c, selectedWeekKey)}))
+                .filter(c => c.calc.isEvaluated)
+                .sort((a, b) => b.calc.average - a.calc.average);
+
+            if (sortedClubs.length === 0) {
+                list.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Nenhuma avaliação nesta semana.</p>';
+                return;
+            }
+            sortedClubs.forEach(club => {
+                const rating = getRatingInfo(club.calc.average, true);
+                list.innerHTML += `
+                    <div class="flex justify-between items-center p-2 input-bg rounded-md">
+                        <span class="font-medium text-sm">${club.emoji} ${club.name}</span>
+                        <span class="font-bold text-sm ${rating.color}">${club.calc.average.toFixed(2)}</span>
+                    </div>`;
+            });
+        }
+
+        function renderWeeklyHighlights() {
+            const list = document.getElementById('weekly-highlights-list');
+            list.innerHTML = '';
+            const highlighted = [...appData.clubs]
+                .map(c => ({ ...c, calc: calculateWeeklyAverage(c, selectedWeekKey) }))
+                .filter(c => c.calc.average > 3.5)
+                .sort((a, b) => b.calc.average - a.calc.average).slice(0, 3);
+
+            if (highlighted.length === 0) {
+                list.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Nenhum destaque nesta semana.</p>';
+                return;
+            }
+            highlighted.forEach(club => {
+                const rating = getRatingInfo(club.calc.average, true);
+                list.innerHTML += `
+                    <div class="flex items-center p-2 ${rating.bg} rounded-md">
+                        <span class="text-2xl mr-3">🏆</span>
+                        <div>
+                            <p class="font-semibold text-green-800 dark:text-green-200">${club.name}</p>
+                            <p class="text-sm text-green-600 dark:text-green-400">Média: ${club.calc.average.toFixed(2)}</p>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        // --- Manipulação de Clubes e Critérios ---
+        function addClub() {
+            const input = document.getElementById('new-club-name');
+            const name = input.value.trim();
+            if (name) {
+                const clubId = 'club-' + Date.now();
+                const criteriaTemplate = appData.clubs.length > 0 ? appData.clubs[0].criteria.map(c => ({ name: c.name, evaluations: {} })) : initialCriteria;
+                const newCriteria = JSON.parse(JSON.stringify(criteriaTemplate));
+                
+                appData.clubs.push({
+                    id: clubId, name: name,
+                    emoji: '⏳', criteria: newCriteria
+                });
+                input.value = '';
+                saveData();
+                renderAll();
+                updateClubEmoji(clubId, name);
+            }
+        }
+
+        async function updateClubEmoji(clubId, clubName) {
+            const emoji = await getEmojiForClub(clubName);
+            const club = appData.clubs.find(c => c.id === clubId);
+            if(club) {
+                club.emoji = emoji;
+                saveData();
+                renderAll();
+            }
+        }
+
+        function startEditClub(clubId) {
+            const clubDiv = document.getElementById(`club-${clubId}`);
+            const club = appData.clubs.find(c => c.id === clubId);
+            if (!club || clubDiv.querySelector('input')) return;
+
+            const titleContainer = clubDiv.querySelector('.w-full');
+            
+            titleContainer.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <input type="text" value="${club.emoji}" class="w-10 text-center p-1 rounded-md input-bg border border-gray-300 dark:border-gray-600" maxlength="2">
+                    <input type="text" value="${club.name}" class="flex-grow p-1 rounded-md input-bg border border-gray-300 dark:border-gray-600">
+                    <button class="bg-green-500 text-white p-1 rounded-md">✓</button>
+                    <button class="bg-red-500 text-white p-1 rounded-md">&times;</button>
+                    <button class="bg-yellow-500 text-white p-1 rounded-md" title="Excluir Clube">🗑️</button>
+                </div>
+            `;
+            
+            const inputs = titleContainer.querySelectorAll('input');
+            const saveBtn = titleContainer.querySelectorAll('button')[0];
+            const cancelBtn = titleContainer.querySelectorAll('button')[1];
+            const deleteBtn = titleContainer.querySelectorAll('button')[2];
+
+            inputs[1].focus();
+            
+            const saveChanges = () => {
+                club.emoji = inputs[0].value.trim() || '❓';
+                club.name = inputs[1].value.trim() || 'Clube Sem Nome';
+                saveData();
+                renderAll();
+            };
+
+            deleteBtn.onclick = () => {
+                if (confirm(`Tem certeza que deseja excluir o clube "${club.name}"? Esta ação não pode ser desfeita.`)) {
+                    appData.clubs = appData.clubs.filter(c => c.id !== clubId);
+                    saveData();
+                    renderAll();
+                }
+            };
+
+            saveBtn.onclick = saveChanges;
+            cancelBtn.onclick = () => renderAll();
+            
+            inputs.forEach(input => {
+                input.onkeydown = (e) => {
+                    if (e.key === 'Enter') saveChanges();
+                    if (e.key === 'Escape') cancelBtn.onclick();
+                };
+            });
+        }
+        
+        function addCriterion() {
+            const input = document.getElementById('new-criterion-name');
+            const name = input.value.trim();
+            if (name) {
+                appData.clubs.forEach(club => {
+                    if (!club.criteria.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+                        club.criteria.push({ name: name, evaluations: {} });
+                    }
+                });
+                input.value = '';
+                saveData();
+                const currentClub = appData.clubs.find(c => c.id === currentClubId);
+                if (currentClub) renderCriteriaTable(currentClub);
+            }
+        }
+
+        function renderCriteriaTable(club) {
+            const table = document.getElementById('modal-criteria-table');
+            const selectedWeek = selectedWeekKey;
+            table.innerHTML = '';
+            club.criteria.forEach((criterion, index) => {
+                const currentScore = criterion.evaluations[selectedWeek]?.[appData.currentProfile] || 0;
+                const row = document.createElement('div');
+                row.className = `card p-3 rounded-lg shadow-sm flex flex-col sm:flex-row justify-between items-center`;
+                row.innerHTML = `
+                    <div class="flex-grow mb-2 sm:mb-0">
+                        <p class="text-md font-medium">${criterion.name}</p>
+                        <p class="text-sm ${getRatingInfo(currentScore, currentScore > 0).color}">${getStarText(currentScore)}</p>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="star-rating flex text-3xl mr-4" data-idx="${index}">
+                            ${[1, 2, 3, 4, 5].map(i => `<span class="star ${getStarColor(i)} ${currentScore >= i ? 'opacity-100' : 'opacity-25'}" data-val="${i}">★</span>`).join('')}
+                        </div>
+                        <button onclick="deleteCriterion(${index})" class="text-red-500 hover:text-red-700 font-bold text-2xl p-1" title="Excluir Critério">&times;</button>
+                    </div>`;
+                table.appendChild(row);
+            });
+            document.querySelectorAll('.star-rating').forEach(g => g.addEventListener('click', e => {
+                if (e.target.classList.contains('star')) {
+                    updateScore(parseInt(g.dataset.idx), parseInt(e.target.dataset.val));
+                }
+            }));
+        }
+
+        function updateScore(critIdx, score) {
+            const club = appData.clubs.find(c => c.id === currentClubId);
+            if (club) {
+                if (!club.criteria[critIdx].evaluations[selectedWeekKey]) {
+                    club.criteria[critIdx].evaluations[selectedWeekKey] = {};
+                }
+                club.criteria[critIdx].evaluations[selectedWeekKey][appData.currentProfile] = score;
+                renderCriteriaTable(club);
+            }
+        }
+        
+        function deleteCriterion(critIdx) {
+            const club = appData.clubs.find(c => c.id === currentClubId);
+            if (club) {
+                const criterionName = club.criteria[critIdx].name;
+                appData.clubs.forEach(c => {
+                    c.criteria = c.criteria.filter(crit => crit.name !== criterionName);
+                });
+                saveData();
+                renderCriteriaTable(club);
+            }
+        }
+
+        function submitEvaluation() {
+            const club = appData.clubs.find(c => c.id === currentClubId);
+            if (!club) return;
+
+            const isFullyRated = club.criteria.every(c => c.evaluations[selectedWeekKey]?.[appData.currentProfile] > 0);
+            if (!isFullyRated) {
+                showEvaluationFeedback("Por favor, avalie todos os critérios.");
+                return;
+            }
+            
+            saveData();
+            closeModal('club-modal');
+            showMainToast("Avaliação salva com sucesso!");
+        }
+
+        // --- Modals & Notifications ---
+        function openModal(modalId, clubId = null) {
+            if (clubId) {
+                currentClubId = clubId;
+                const club = appData.clubs.find(c => c.id === clubId);
+                if (!club) return;
+                document.getElementById('modal-club-name').innerHTML = `${club.emoji} ${club.name}`;
+                document.getElementById('ai-feedback-container').innerHTML = '';
+                document.getElementById('evaluation-feedback').innerHTML = '';
+                renderCriteriaTable(club);
+                document.getElementById('add-criterion-btn').onclick = addCriterion;
+            }
+            document.getElementById(modalId).style.display = 'flex';
+        }
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+            if (modalId === 'club-modal') {
+                currentClubId = null;
+                renderAll();
+            }
+            if (modalId === 'chart-modal' && clubChart) {
+                clubChart.destroy();
+            }
+        }
+        function showEvaluationFeedback(message) {
+            const feedbackEl = document.getElementById('evaluation-feedback');
+            feedbackEl.textContent = message;
+            feedbackEl.classList.remove('opacity-0');
+            if(feedbackTimeout) clearTimeout(feedbackTimeout);
+            feedbackTimeout = setTimeout(() => {
+                feedbackEl.classList.add('opacity-0');
+            }, 3000);
+        }
+        function showMainToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            const typeClasses = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+            toast.className = `main-toast ${typeClasses}`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
+
+        // --- Perfil e Seleção de Semana ---
+        function selectProfile(profile) {
+            appData.currentProfile = profile;
+            selectedWeekKey = document.getElementById('profile-week-selector').value;
+            document.getElementById('global-week-selector').value = selectedWeekKey;
+            saveData();
+            closeModal('profile-modal');
+            updateProfileDisplay();
+            renderAll();
+        }
+        function changeProfile() {
+            appData.currentProfile = null;
+            saveData();
+            openModal('profile-modal');
+        }
+        function updateProfileDisplay() {
+            const profileNames = {
+                professor: 'Professor',
+                diretor: 'Diretor',
+                viceDiretor: 'Vice-Diretor'
+            };
+            document.getElementById('current-profile-display').textContent = `${profileNames[appData.currentProfile] || 'Nenhum'}`;
+        }
+        
+        function populateWeekSelector(selectorId, defaultWeek) {
+            const selector = document.getElementById(selectorId);
+            selector.innerHTML = '';
+            const mondays = getMondaysUntilEndOfYear();
+            
+            mondays.forEach(mondayDate => {
+                const option = document.createElement('option');
+                option.value = mondayDate;
+                const date = new Date(mondayDate + 'T12:00:00');
+                option.textContent = `Semana de ${date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`;
+                if (mondayDate === defaultWeek) {
+                    option.selected = true;
+                }
+                selector.appendChild(option);
+            });
+        }
+
+        function navigateWeek(direction, selectorId) {
+            const selector = document.getElementById(selectorId);
+            const currentIndex = selector.selectedIndex;
+            const newIndex = currentIndex + direction;
+
+            if (newIndex >= 0 && newIndex < selector.options.length) {
+                selector.selectedIndex = newIndex;
+                selector.dispatchEvent(new Event('change'));
+            }
+        }
+
+        function initializeWeekSelection() {
+            const initialWeek = getInitialWeek();
+            selectedWeekKey = initialWeek;
+
+            populateWeekSelector('global-week-selector', initialWeek);
+            populateWeekSelector('profile-week-selector', initialWeek);
+
+            document.getElementById('global-week-selector').onchange = (e) => {
+                selectedWeekKey = e.target.value;
+                document.getElementById('profile-week-selector').value = selectedWeekKey;
+                renderAll();
+            };
+            document.getElementById('prev-week-btn').addEventListener('click', () => navigateWeek(-1, 'global-week-selector'));
+            document.getElementById('next-week-btn').addEventListener('click', () => navigateWeek(1, 'global-week-selector'));
+
+            document.getElementById('profile-week-selector').onchange = (e) => {
+                document.getElementById('global-week-selector').value = e.target.value;
+                document.getElementById('global-week-selector').dispatchEvent(new Event('change'));
+            };
+            document.getElementById('modal-prev-week-btn').addEventListener('click', () => navigateWeek(-1, 'profile-week-selector'));
+            document.getElementById('modal-next-week-btn').addEventListener('click', () => navigateWeek(1, 'profile-week-selector'));
+        }
+
+        // --- Dropdown e Gráfico ---
+        function toggleDropdown(id) {
+            document.getElementById(id).classList.toggle("show");
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.matches('.dropdown button, .dropdown button *')) {
+                var dropdowns = document.getElementsByClassName("dropdown-content");
+                for (var i = 0; i < dropdowns.length; i++) {
+                    var openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) {
+                        openDropdown.classList.remove('show');
+                    }
+                }
+            }
+            if (event.target.classList.contains('modal')) {
+                closeModal(event.target.id);
+            }
+        }
+
+        function openChartModal(clubId) {
+            const club = appData.clubs.find(c => c.id === clubId);
+            if (!club) return;
+            
+            const weekSelector = document.getElementById('global-week-selector');
+            const labels = Array.from(weekSelector.options).map(opt => opt.text);
+            const weekKeys = Array.from(weekSelector.options).map(opt => opt.value);
+            
+            const dataPoints = weekKeys.map(weekKey => {
+                const { average, isEvaluated } = calculateWeeklyAverage(club, weekKey);
+                return isEvaluated ? average : null;
+            });
+
+            const ctx = document.getElementById('club-chart').getContext('2d');
+            const isDark = document.documentElement.classList.contains('dark');
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+            const labelColor = isDark ? '#f9fafb' : '#1f2937';
+
+            if (clubChart) {
+                clubChart.destroy();
+            }
+
+            clubChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `Média de ${club.name}`,
+                        data: dataPoints,
+                        borderColor: '#4f46e5',
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        spanGaps: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 5,
+                            ticks: { color: labelColor },
+                            grid: { color: gridColor }
+                        },
+                        x: {
+                            ticks: { color: labelColor },
+                            grid: { color: gridColor }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: { color: labelColor }
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('chart-modal-title').innerText = `Desempenho de ${club.name}`;
+            openModal('chart-modal');
+        }
+
+
+        // --- Relatórios ---
+        function getWeeklyHighlightsData(weekKey) {
+             return [...appData.clubs]
+                .map(c => ({ ...c, calc: calculateWeeklyAverage(c, weekKey) }))
+                .filter(c => c.calc.isEvaluated && c.calc.average > 3.5)
+                .sort((a, b) => b.calc.average - a.calc.average)
+                .slice(0, 3);
+        }
+
+        function generateReportHTML(isForPDF = false) {
+            const textColor = isForPDF ? '#111827' : 'var(--text-light)';
+            const subTextColor = isForPDF ? '#4b5563' : 'var(--text-light)';
+            const colorMap = { 'red': '#ef4444', 'orange': '#f97316', 'green': '#22c55e', 'gray': '#9ca3af' };
+            
+            const highlighted = [...appData.clubs]
+                .map(c => ({ ...c, calc: calculateAverage(c) }))
+                .filter(c => c.calc.average > 3.5)
+                .sort((a, b) => b.calc.average - a.calc.average).slice(0, 3);
+            
+            const criterionHighlights = calculateCriterionHighlights();
+            const weeklyHighlights = getWeeklyHighlightsData(selectedWeekKey);
+
+            let html = `<div id="report-content" class="p-2 sm:p-4" style="background-color: var(--bg-light);">
+                <h1 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; text-align: center; color: ${textColor};">Relatório de Situação dos Clubes</h1>`;
+            
+            if(highlighted.length > 0) {
+                html += `<h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; text-align: center; color: ${textColor};">🏆 Destaques Gerais 🏆</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">`;
+                highlighted.forEach(club => {
+                    html += `<div class="card" style="border-radius: 8px; padding: 1rem; text-align: center;">
+                                <p style="font-size: 2rem; margin:0;">${club.emoji}</p>
+                                <p style="font-weight: 600; color: ${textColor}; margin: 4px 0;">${club.name}</p>
+                                <p style="font-size: 0.875rem; color: ${subTextColor}; margin:0;">Média: ${club.calc.average.toFixed(2)}</p>
+                             </div>`;
+                });
+                html += `</div> <hr style="border-color: #e5e7eb; margin-bottom: 1.5rem;">`;
+            }
+
+            if(criterionHighlights.length > 0) {
+                html += `<h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; text-align: center; color: ${textColor};">🏅 Destaques por Critério 🏅</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">`;
+                criterionHighlights.forEach(item => {
+                    html += `<div class="card" style="border-radius: 8px; padding: 1rem;">
+                                <p style="font-weight: 600; color: ${textColor}; margin: 0 0 4px 0;">${item.criterion}</p>
+                                <p style="font-size: 0.875rem; color: ${subTextColor}; margin:0;">${item.emoji} ${item.clubName} - <strong>${item.score.toFixed(2)}</strong></p>
+                             </div>`;
+                });
+                html += `</div> <hr style="border-color: #e5e7eb; margin-bottom: 1.5rem;">`;
+            }
+
+            html += `<h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; text-align: center; color: ${textColor};">Todos os Clubes</h2>
+                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">`;
+
+            appData.clubs.forEach(club => {
+                const { average, isEvaluated } = calculateAverage(club);
+                const rating = getRatingInfo(average, isEvaluated);
+                const borderColor = colorMap[rating.colorName] || '#9ca3af';
+                const statusColor = colorMap[rating.colorName] || '#9ca3af';
+
+                html += `
+                    <div class="card" style="border: 1px solid #e5e7eb; border-left: 5px solid ${borderColor}; border-radius: 8px; padding: 1rem; font-family: 'Inter', sans-serif;">
+                        <h3 class="text-lg font-semibold title-color" style="color: ${textColor};">${club.emoji} ${club.name}</h3>
+                        <p class="text-sm" style="color: ${subTextColor};">Situação: <span style="font-weight: bold; color: ${statusColor};">${rating.text}</span></p>
+                        <p class="text-sm" style="color: ${subTextColor};">Média Final: ${average.toFixed(2)}</p>
+                    </div>`;
+            });
+            html += `</div>`;
+
+            if(weeklyHighlights.length > 0) {
+                const weekText = document.getElementById('global-week-selector').options[document.getElementById('global-week-selector').selectedIndex].text;
+                html += `<hr style="border-color: #e5e7eb; margin: 1.5rem 0;">
+                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; text-align: center; color: ${textColor};">🌟 Destaques da ${weekText} 🌟</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">`;
+                weeklyHighlights.forEach(club => {
+                    html += `<div class="card" style="border-radius: 8px; padding: 1rem; text-align: center;">
+                                <p style="font-size: 2rem; margin:0;">${club.emoji}</p>
+                                <p style="font-weight: 600; color: ${textColor}; margin: 4px 0;">${club.name}</p>
+                                <p style="font-size: 0.875rem; color: ${subTextColor}; margin:0;">Média: ${club.calc.average.toFixed(2)}</p>
+                             </div>`;
+                });
+                html += `</div>`;
+            }
+
+            html += `</div>`;
+            return html;
+        }
+        function openReportModal() {
+            document.getElementById('report-preview-content').innerHTML = generateReportHTML(false);
+            openModal('report-modal');
+        }
+        async function exportReport() {
+            const reportContainer = document.createElement('div');
+            reportContainer.style.position = 'absolute';
+            reportContainer.style.left = '-9999px';
+            reportContainer.style.width = '800px';
+            
+            const highlighted = [...appData.clubs]
+                .map(c => ({ ...c, calc: calculateAverage(c) }))
+                .filter(c => c.calc.average > 3.5)
+                .sort((a, b) => b.calc.average - a.calc.average).slice(0, 3);
+            
+            const criterionHighlights = calculateCriterionHighlights();
+            const weeklyHighlights = getWeeklyHighlightsData(selectedWeekKey);
+
+            let pdfHTML = `
+                <div style="padding: 20px; background-color: #ffffff; font-family: 'Inter', sans-serif;">
+                    <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 16px; text-align: center; color: #111827;">Relatório de Situação dos Clubes</h1>`;
+
+            if(highlighted.length > 0) {
+                pdfHTML += `<h2 style="font-size: 20px; font-weight: 600; margin-bottom: 16px; text-align: center; color: #111827;">🏆 Destaques Gerais 🏆</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px;">`;
+                highlighted.forEach(club => {
+                    pdfHTML += `<div style="background-color: #f9fafb; border-radius: 8px; padding: 16px; text-align: center;">
+                                    <p style="font-size: 32px; margin:0;">${club.emoji}</p>
+                                    <p style="font-size: 16px; font-weight: 600; color: #111827; margin: 4px 0;">${club.name}</p>
+                                    <p style="font-size: 14px; color: #4b5563; margin:0;">Média: ${club.calc.average.toFixed(2)}</p>
+                                 </div>`;
+                });
+                pdfHTML += `</div> <hr style="border-color: #e5e7eb; margin-bottom: 24px;">`;
+            }
+
+            if(criterionHighlights.length > 0) {
+                pdfHTML += `<h2 style="font-size: 20px; font-weight: 600; margin-bottom: 16px; text-align: center; color: #111827;">🏅 Destaques por Critério 🏅</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">`;
+                criterionHighlights.forEach(item => {
+                    pdfHTML += `<div style="background-color: #f9fafb; border-radius: 8px; padding: 16px;">
+                                    <p style="font-size: 16px; font-weight: 600; color: #111827; margin: 0 0 4px 0;">${item.criterion}</p>
+                                    <p style="font-size: 14px; color: #4b5563; margin:0;">${item.emoji} ${item.clubName} - <strong>${item.score.toFixed(2)}</strong></p>
+                                 </div>`;
+                });
+                pdfHTML += `</div> <hr style="border-color: #e5e7eb; margin-bottom: 24px;">`;
+            }
+            
+            pdfHTML += `<h2 style="font-size: 20px; font-weight: 600; margin-bottom: 16px; text-align: center; color: #111827;">Todos os Clubes</h2>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">` 
+            + appData.clubs.map(club => {
+                const { average, isEvaluated } = calculateAverage(club);
+                const rating = getRatingInfo(average, isEvaluated);
+                const colorMap = { 'red': '#ef4444', 'orange': '#f97316', 'green': '#22c55e', 'gray': '#9ca3af' };
+                const borderColor = colorMap[rating.colorName] || '#9ca3af';
+                const statusColor = colorMap[rating.colorName] || '#9ca3af';
+                return `
+                    <div style="border: 1px solid #e5e7eb; border-left: 5px solid ${borderColor}; border-radius: 8px; padding: 16px; font-family: 'Inter', sans-serif; background-color: #ffffff;">
+                        <h3 style="font-size: 18px; font-weight: 600; color: #111827; margin:0 0 4px 0;">${club.emoji} ${club.name}</h3>
+                        <p style="font-size: 14px; color: #4b5563; margin:0 0 4px 0;">Situação: <span style="font-weight: bold; color: ${statusColor};">${rating.text}</span></p>
+                        <p style="font-size: 14px; color: #4b5563; margin:0;">Média Final: ${average.toFixed(2)}</p>
+                    </div>`;
+            }).join('') + `</div>`;
+
+            if(weeklyHighlights.length > 0) {
+                const weekText = document.getElementById('global-week-selector').options[document.getElementById('global-week-selector').selectedIndex].text;
+                pdfHTML += `<hr style="border-color: #e5e7eb; margin-top: 24px; margin-bottom: 24px;">
+                <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 16px; text-align: center; color: #111827;">🌟 Destaques da ${weekText} 🌟</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">`;
+                weeklyHighlights.forEach(club => {
+                    pdfHTML += `<div style="background-color: #f9fafb; border-radius: 8px; padding: 16px; text-align: center;">
+                                    <p style="font-size: 32px; margin:0;">${club.emoji}</p>
+                                    <p style="font-size: 16px; font-weight: 600; color: #111827; margin: 4px 0;">${club.name}</p>
+                                    <p style="font-size: 14px; color: #4b5563; margin:0;">Média: ${club.calc.average.toFixed(2)}</p>
+                                 </div>`;
+                });
+                pdfHTML += `</div>`;
+            }
+
+            pdfHTML += `</div>`;
+
+
+            reportContainer.innerHTML = pdfHTML;
+            document.body.appendChild(reportContainer);
+
+            try {
+                const canvas = await html2canvas(reportContainer, { scale: 2 });
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                pdf.save('relatorio-clubes.pdf');
+            } catch (error) {
+                console.error("Erro ao gerar PDF:", error);
+            } finally {
+                document.body.removeChild(reportContainer);
+            }
+        }
+
+        // --- Gemini API ---
+        async function generateFeedback() {
+            const club = appData.clubs.find(c => c.id === currentClubId);
+            if (!club) return;
+            const btn = document.getElementById('generate-feedback-btn');
+            const feedbackContainer = document.getElementById('ai-feedback-container');
+            btn.disabled = true;
+            btn.innerHTML = `<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Gerando...`;
+            feedbackContainer.innerHTML = '';
+
+            const criteriaText = club.criteria.map(c => `- ${c.name}: ${getStarText(c.evaluations[selectedWeekKey]?.[appData.currentProfile] || 0)} (${c.evaluations[selectedWeekKey]?.[appData.currentProfile] || 0}/5)`).join('\n');
+            const prompt = `
+                Seja um mentor de clubes. Use uma linguagem muito simples, direta e positiva. Dê dicas curtas e práticas, como se estivesse mandando uma mensagem rápida. Responda em português do Brasil.
+                O clube é o "${club.name}". As notas do perfil "${appData.currentProfile}" foram:
+                ${criteriaText}
+                Com base nisso, dê 1 elogio sobre o ponto mais forte e 2 dicas rápidas e fáceis para melhorar os pontos mais fracos.
+                Formate a resposta em HTML simples: use <h3> para o título "Dicas Rápidas" e uma lista não ordenada (<ul> com <li>) para os itens. Mantenha o texto bem curto e objetivo.
+            `;
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+
+            try {
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                const result = await response.json();
+                if (result.candidates?.[0]?.content.parts[0].text) {
+                    feedbackContainer.innerHTML = result.candidates[0].content.parts[0].text;
+                } else {
+                    feedbackContainer.innerHTML = '<p class="text-red-500">A IA não conseguiu gerar o feedback desta vez.</p>';
+                }
+            } catch (error) {
+                console.error("Erro na API Gemini:", error);
+                feedbackContainer.innerHTML = '<p class="text-red-500">Ocorreu um erro de comunicação com a IA. Tente novamente.</p>';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '✨ Gerar Dicas';
+            }
+        }
+
+        // --- Inicialização ---
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            const newTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+            localStorage.setItem('theme', newTheme);
+            applyTheme(newTheme);
+        });
+        document.getElementById('new-club-name').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                addClub();
+            }
+        });
+        
+        window.onload = loadData;
+    </script>
+</body>
+</html>
